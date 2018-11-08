@@ -1,0 +1,5 @@
+*.swp
+*.iml
+*.pyc
+.idea
+ghostscript.log

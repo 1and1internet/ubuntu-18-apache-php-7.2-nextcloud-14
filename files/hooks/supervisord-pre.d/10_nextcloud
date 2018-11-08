@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+set -e
+
+function nextcloudnotinstalled {
+    [ ! -d ${SITE_FOLDER} ] || [ $(ls -A $SITE_FOLDER | wc -l) -lt 3 ] && return 0
+    return 1
+}
+
+function shouldinstall {
+    [ -z $SKIPINSTALL ] || [ $SKIPINSTALL != "true" ] || return 1
+    return 0
+}
+
+function install_files {
+  rm -rf $SITE_FOLDER/*
+  cd $SOURCE_FOLDER
+  INSTALLATION_FILE=$(ls nextcloud*.tar.bz2)
+  echo "Unpacking $INSTALLATION_FILE"
+  tar jxf ${INSTALLATION_FILE}
+  cd nextcloud
+  cp -r $(ls -A) ${SITE_FOLDER}/
+  cd -
+  rm -rf nextcloud
+}
+
+function install_nextcloud {
+  if [ ! -z $NEXTCLOUD_DB_USER ]; then
+    cd $SITE_FOLDER
+    EXIT_STATUS=1
+    while [ $EXIT_STATUS -ne 0 ]; do
+      php occ  maintenance:install \
+              --database mysql \
+              --database-host $NEXTCLOUD_DB_HOST \
+              --database-port 3306 \
+              --database-name $NEXTCLOUD_DB_NAME \
+              --database-user $NEXTCLOUD_DB_USER \
+              --database-pass $NEXTCLOUD_DB_PASSWORD \
+              --admin-user $NEXTCLOUD_ADMIN_USER \
+              --admin-pass $NEXTCLOUD_ADMIN_PASSWORD \
+              --data-dir ${DATA_FOLDER}
+      EXIT_STATUS=$?
+      [ $EXIT_STATUS -ne 0 ] && {
+        echo "Failed installation, potentially waiting for database. Will sleep and retry..."
+        sleep 10
+      }
+    done
+
+    # Note, also:
+    #        --database-table-prefix "oc_"
+    #        --database-table-space ???
+    return 0
+  fi
+  echo "Missing parameters for installation - aborted"
+  return 1
+}
+
+function configure_smtp {
+  # Ref: https://docs.nextcloud.com/server/14/admin_manual/configuration_server/email_configuration.html
+  if [ ! -z $SMTP_RELAYHOST ]; then
+    SMTP_LINES='  "mail_smtphost" => "'$SMTP_RELAYHOST'",\n'
+    SMTP_LINES=$SMTP_LINES'  "mail_smtpport" => "25",\n'
+    SMTP_LINES=$SMTP_LINES'  "mail_smtpauth" => true,\n'
+    SMTP_LINES=$SMTP_LINES'  "mail_smtpauthtype" => "LOGIN",\n'
+    SMTP_LINES=$SMTP_LINES'  "mail_smtpname" => "'$SMTP_USER'",\n'
+    SMTP_LINES=$SMTP_LINES'  "mail_smtppassword" => "'$SMTP_PASS'",'
+    sed -i "/^);$/i $SMTP_LINES" ${SITE_FOLDER}/config/config.php
+  fi
+}
+
+function configure_redis {
+  # Ref: https://docs.nextcloud.com/server/14/admin_manual/configuration_server/caching_configuration.html
+  if [ ! -z $REDIS_HOST ]; then
+    REDIS_LINES='  "memcache.local" => "\\OC\\Memcache\\Redis",\n'
+    REDIS_LINES=$REDIS_LINES'  "redis" => array (\n'
+    REDIS_LINES=$REDIS_LINES'         "host" => "'$REDIS_HOST'",\n'
+    REDIS_LINES=$REDIS_LINES'         "port" => 6379,\n'
+    REDIS_LINES=$REDIS_LINES'   ),\n'
+    REDIS_LINES=$REDIS_LINES'  "memcache.locking" => "\\OC\\Memcache\\Redis",'
+    sed -i "/^);$/i $REDIS_LINES" ${SITE_FOLDER}/config/config.php
+  fi
+}
+
+function configure_cron {
+  cd $SITE_FOLDER
+  php occ background:cron
+}
+
+function trusted_domain {
+  if [ ! -z $DEFAULT_DOMAIN ]; then
+    sed -i "/0 => 'localhost',$/a  1 => '$DEFAULT_DOMAIN',\n" ${SITE_FOLDER}/config/config.php
+  fi
+}
+
+if nextcloudnotinstalled; then
+  {
+    echo "Copying nextcloud source into $DOCUMENT_ROOT ..."
+    install_files
+    shouldinstall && {
+      echo "Running nextcloud installation steps..."
+      install_nextcloud && {
+        echo "Extra configuration steps..."
+        configure_smtp
+        configure_cron
+        configure_redis
+        trusted_domain
+      }
+    }
+  } | tee /var/log/nextcloud_install 2>&1
+fi
