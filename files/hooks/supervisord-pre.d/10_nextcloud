@@ -92,8 +92,28 @@ function trusted_domain {
     fi
 }
 
+function first_cron_run {
+    echo "Performing first cron run..."
+    cd /var/www/nextcloud
+    php cron.php
+}
+
+function show_installation_page {
+    cd /var/www
+    tar zxf /opt/installing.tar.gz
+    source /etc/apache2/envvars
+    export DOCUMENT_ROOT=installing
+    /usr/sbin/apache2 -DFOREGROUND &
+}
+
+function stop_showing_installation_page {
+    apachectl -k graceful-stop
+    rm -rf /var/www/installing
+}
+
 if nextcloudnotinstalled; then
     {
+        show_installation_page
         echo "Copying nextcloud source into $DOCUMENT_ROOT ..."
         install_files
         shouldinstall && {
@@ -104,7 +124,9 @@ if nextcloudnotinstalled; then
                 configure_cron
                 configure_redis
                 trusted_domain
+                first_cron_run
             }
         }
+        stop_showing_installation_page
     } | tee /var/log/nextcloud_install 2>&1
 fi
