@@ -12,7 +12,7 @@ function shouldinstall {
     return 0
 }
 
-function install_files {
+function unpack_files {
     rm -rf $SITE_FOLDER/*
     cd $SOURCE_FOLDER
     INSTALLATION_FILE=$(ls nextcloud*.tar.bz2)
@@ -84,18 +84,14 @@ function configure_redis {
 function configure_cron {
     cd $SITE_FOLDER
     php occ background:cron
+    echo "Performing first cron run..."
+    php cron.php
 }
 
 function trusted_domain {
     if [ ! -z $DEFAULT_DOMAIN ]; then
         sed -i "/0 => 'localhost',$/a  1 => '$DEFAULT_DOMAIN',\n" ${SITE_FOLDER}/config/config.php
     fi
-}
-
-function first_cron_run {
-    echo "Performing first cron run..."
-    cd /var/www/nextcloud
-    php cron.php
 }
 
 function show_installation_page {
@@ -115,7 +111,7 @@ if nextcloudnotinstalled; then
     {
         show_installation_page
         echo "Copying nextcloud source into $DOCUMENT_ROOT ..."
-        install_files
+        unpack_files
         shouldinstall && {
             echo "Running nextcloud installation steps..."
             install_nextcloud && {
@@ -124,7 +120,6 @@ if nextcloudnotinstalled; then
                 configure_cron
                 configure_redis
                 trusted_domain
-                first_cron_run
             }
         }
         stop_showing_installation_page
