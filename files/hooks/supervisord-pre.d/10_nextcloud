@@ -103,15 +103,13 @@ function show_installation_page {
 }
 
 function stop_showing_installation_page {
-    echo "Shutting down apache..."
-    apachectl -k graceful-stop
-    while [ "$(pidof apache2)" ]; do
-        echo "Waiting for apache processes to stop..."
-        sleep 2
-    done
-    echo "TEST1"
+    #echo "Shutting down apache..."
+    #apachectl -k graceful-stop
     rm -rf /var/www/installing
-    echo "TEST2"
+    #while [ "$(pidof apache2)" ]; do
+    #    echo "Waiting for apache processes to stop..."
+    #    sleep 2
+    #done
 }
 
 if nextcloudnotinstalled; then
@@ -130,8 +128,6 @@ if nextcloudnotinstalled; then
             }
         }
         stop_showing_installation_page
-        echo "TEST3"
+        echo $?
     } | tee /var/log/nextcloud_install 2>&1
-    echo "TEST4"
 fi
-echo "TEST5"
