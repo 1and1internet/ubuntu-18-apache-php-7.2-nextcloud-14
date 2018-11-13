@@ -84,8 +84,8 @@ function configure_redis {
 function configure_cron {
     cd $SITE_FOLDER
     php occ background:cron
-    echo "Performing first cron run..."
-    php cron.php
+    echo "Setting up first cron run"
+    ( sleep 60 && php cron.php ) &
 }
 
 function trusted_domain {
