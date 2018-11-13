@@ -99,17 +99,17 @@ function show_installation_page {
     tar zxf /opt/installing.tar.gz
     source /etc/apache2/envvars
     export DOCUMENT_ROOT=installing
-    /usr/sbin/apache2 -DFOREGROUND &
+    bash -c /usr/sbin/apache2 -DFOREGROUND &
 }
 
 function stop_showing_installation_page {
-    #echo "Shutting down apache..."
-    #apachectl -k graceful-stop
+    echo "Shutting down apache..."
+    apachectl -k graceful-stop
+    while [ "$(pidof apache2)" ]; do
+        echo "Waiting for apache processes to stop..."
+        sleep 2
+    done
     rm -rf /var/www/installing
-    #while [ "$(pidof apache2)" ]; do
-    #    echo "Waiting for apache processes to stop..."
-    #    sleep 2
-    #done
 }
 
 if nextcloudnotinstalled; then
@@ -128,6 +128,5 @@ if nextcloudnotinstalled; then
             }
         }
         stop_showing_installation_page
-        echo $?
     } | tee /var/log/nextcloud_install 2>&1
 fi
