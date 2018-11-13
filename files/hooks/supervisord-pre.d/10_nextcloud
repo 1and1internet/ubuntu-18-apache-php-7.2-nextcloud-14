@@ -109,7 +109,9 @@ function stop_showing_installation_page {
         echo "Waiting for apache processes to stop..."
         sleep 2
     done
+    echo "TEST1"
     rm -rf /var/www/installing
+    echo "TEST2"
 }
 
 if nextcloudnotinstalled; then
@@ -128,6 +130,8 @@ if nextcloudnotinstalled; then
             }
         }
         stop_showing_installation_page
-        echo $?
+        echo "TEST3"
     } | tee /var/log/nextcloud_install 2>&1
+    echo "TEST4"
 fi
+echo "TEST5"
